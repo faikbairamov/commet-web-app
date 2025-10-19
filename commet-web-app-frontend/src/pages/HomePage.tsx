@@ -95,13 +95,6 @@ const HomePage: React.FC = () => {
     },
   ];
 
-  const stats = [
-    { label: "Repositories Analyzed", value: "10,000+", icon: BarChart3 },
-    { label: "Commits Processed", value: "1M+", icon: GitBranch },
-    { label: "Active Users", value: "500+", icon: Users },
-    { label: "AI Queries", value: "50K+", icon: Bot },
-  ];
-
   const quickActions = [
     {
       title: "Analyze Repositories",
@@ -177,28 +170,6 @@ const HomePage: React.FC = () => {
                 Explore Commits
                 <ArrowRight className="h-5 w-5 ml-2" />
               </Link>
-            </div>
-
-            {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto">
-              {stats.map((stat, index) => {
-                const Icon = stat.icon;
-                return (
-                  <div key={index} className="text-center">
-                    <div className="flex justify-center mb-2">
-                      <div className="p-3 bg-muted/50 rounded-lg">
-                        <Icon className="h-6 w-6 text-primary" />
-                      </div>
-                    </div>
-                    <div className="text-2xl font-bold text-foreground mb-1">
-                      {stat.value}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {stat.label}
-                    </div>
-                  </div>
-                );
-              })}
             </div>
           </div>
         </div>

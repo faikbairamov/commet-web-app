@@ -4,14 +4,17 @@ import type {
   CommitsResponse,
   Commit,
   UserRepository,
+  CommitStoryResponse,
 } from "../types/index.js";
 import { useCommits } from "../hooks/useApi";
 import { useApp } from "../contexts/AppContext";
 import RepositorySelector from "../components/RepositorySelector";
 import CommitCard from "../components/CommitCard";
+import CommitStoryView from "../components/CommitStoryView";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorMessage from "../components/ErrorMessage";
 import GitHubAuth from "../components/GitHubAuth";
+import ApiService from "../services/api";
 import {
   Code2,
   RotateCcw,
@@ -20,6 +23,8 @@ import {
   GitBranch,
   BarChart3,
   ExternalLink,
+  BookOpen,
+  List,
 } from "lucide-react";
 import { formatNumber } from "../utils";
 
@@ -39,6 +44,10 @@ const CommitsPage: React.FC = () => {
     useState<UserRepository | null>(null);
   const [selectedBranch, setSelectedBranch] = useState<string>("");
   const [commitsLimit, setCommitsLimit] = useState(20);
+  const [viewMode, setViewMode] = useState<"list" | "story">("list");
+  const [storyData, setStoryData] = useState<CommitStoryResponse | null>(null);
+  const [isGeneratingStory, setIsGeneratingStory] = useState(false);
+  const [storyError, setStoryError] = useState<string | null>(null);
 
   // Get initial values from URL params
   const initialRepo = searchParams.get("repo") || "";
@@ -137,6 +146,41 @@ const CommitsPage: React.FC = () => {
   const handleRetry = () => {
     if (selectedRepository) {
       fetchCommits(selectedRepository.full_name, selectedBranch, commitsLimit);
+    }
+  };
+
+  const generateCommitStory = async (
+    style: "narrative" | "technical" | "casual" = "narrative"
+  ) => {
+    if (!selectedRepository) return;
+
+    setIsGeneratingStory(true);
+    setStoryError(null);
+
+    try {
+      const story = await ApiService.generateCommitStory(
+        selectedRepository.full_name,
+        selectedBranch || undefined,
+        state.accessToken || state.githubToken || undefined,
+        commitsLimit,
+        style
+      );
+      setStoryData(story);
+    } catch (err) {
+      setStoryError(
+        err instanceof Error ? err.message : "Failed to generate story"
+      );
+    } finally {
+      setIsGeneratingStory(false);
+    }
+  };
+
+  const handleViewModeChange = async (mode: "list" | "story") => {
+    setViewMode(mode);
+
+    if (mode === "story" && !storyData && selectedRepository) {
+      // Generate story when switching to story view for the first time
+      await generateCommitStory();
     }
   };
 
@@ -295,17 +339,51 @@ const CommitsPage: React.FC = () => {
                       <h3 className="text-sm font-medium text-foreground mb-3">
                         View Options
                       </h3>
-                      <button
-                        onClick={handleToggleDetails}
-                        disabled={isLoading}
-                        className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors duration-200 ${
-                          showDetails
-                            ? "bg-primary/20 text-primary border border-primary/50"
-                            : "bg-muted text-muted-foreground hover:bg-muted/80 border border-border"
-                        }`}
-                      >
-                        {showDetails ? "Hide" : "Show"} Code Differences
-                      </button>
+
+                      {/* View Mode Toggle */}
+                      <div className="mb-3">
+                        <div className="flex rounded-lg bg-muted p-1">
+                          <button
+                            onClick={() => handleViewModeChange("list")}
+                            disabled={isLoading || isGeneratingStory}
+                            className={`flex-1 flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
+                              viewMode === "list"
+                                ? "bg-background text-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            <List className="w-4 h-4 mr-2" />
+                            List View
+                          </button>
+                          <button
+                            onClick={() => handleViewModeChange("story")}
+                            disabled={isLoading || isGeneratingStory}
+                            className={`flex-1 flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
+                              viewMode === "story"
+                                ? "bg-background text-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            <BookOpen className="w-4 h-4 mr-2" />
+                            Story View
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Additional Options for List View */}
+                      {viewMode === "list" && (
+                        <button
+                          onClick={handleToggleDetails}
+                          disabled={isLoading}
+                          className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors duration-200 ${
+                            showDetails
+                              ? "bg-primary/20 text-primary border border-primary/50"
+                              : "bg-muted text-muted-foreground hover:bg-muted/80 border border-border"
+                          }`}
+                        >
+                          {showDetails ? "Hide" : "Show"} Code Differences
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -419,65 +497,122 @@ const CommitsPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Filters and Sorting */}
-                <div className="card p-6">
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    {/* Search Filter */}
-                    <div className="flex-1">
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <Search className="h-5 w-5 text-muted-foreground" />
+                {/* Content based on view mode */}
+                {viewMode === "list" ? (
+                  <>
+                    {/* Filters and Sorting - Only show in list view */}
+                    <div className="card p-6">
+                      <div className="flex flex-col sm:flex-row gap-4">
+                        {/* Search Filter */}
+                        <div className="flex-1">
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                              <Search className="h-5 w-5 text-muted-foreground" />
+                            </div>
+                            <input
+                              type="text"
+                              placeholder="Filter commits by message or author..."
+                              value={filter}
+                              onChange={(e) => setFilter(e.target.value)}
+                              className="input-field pl-10"
+                            />
+                          </div>
                         </div>
-                        <input
-                          type="text"
-                          placeholder="Filter commits by message or author..."
-                          value={filter}
-                          onChange={(e) => setFilter(e.target.value)}
-                          className="input-field pl-10"
-                        />
+
+                        {/* Sort Options */}
+                        <div className="flex items-center space-x-2">
+                          <Filter className="h-5 w-5 text-muted-foreground" />
+                          <select
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value as any)}
+                            className="input-field"
+                          >
+                            <option value="date">Sort by Date</option>
+                            <option value="additions">Sort by Additions</option>
+                            <option value="deletions">Sort by Deletions</option>
+                          </select>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Sort Options */}
-                    <div className="flex items-center space-x-2">
-                      <Filter className="h-5 w-5 text-muted-foreground" />
-                      <select
-                        value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value as any)}
-                        className="input-field"
-                      >
-                        <option value="date">Sort by Date</option>
-                        <option value="additions">Sort by Additions</option>
-                        <option value="deletions">Sort by Deletions</option>
-                      </select>
+                    {/* Commits List */}
+                    <div className="space-y-4">
+                      {filteredAndSortedCommits.length > 0 ? (
+                        filteredAndSortedCommits.map((commit: Commit) => (
+                          <CommitCard
+                            key={commit.sha}
+                            commit={commit}
+                            showDetails={showDetails}
+                          />
+                        ))
+                      ) : (
+                        <div className="card p-8 text-center">
+                          <Code2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                          <h3 className="text-lg font-medium text-foreground mb-2">
+                            No commits found
+                          </h3>
+                          <p className="text-muted-foreground">
+                            {filter
+                              ? "Try adjusting your search filter."
+                              : "No commits available for this repository."}
+                          </p>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                </div>
-
-                {/* Commits List */}
-                <div className="space-y-4">
-                  {filteredAndSortedCommits.length > 0 ? (
-                    filteredAndSortedCommits.map((commit: Commit) => (
-                      <CommitCard
-                        key={commit.sha}
-                        commit={commit}
-                        showDetails={showDetails}
+                  </>
+                ) : (
+                  /* Story View */
+                  <div>
+                    {storyError && (
+                      <ErrorMessage
+                        error={storyError}
+                        onRetry={() => generateCommitStory()}
+                        className="mb-6"
                       />
-                    ))
-                  ) : (
-                    <div className="card p-8 text-center">
-                      <Code2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-foreground mb-2">
-                        No commits found
-                      </h3>
-                      <p className="text-muted-foreground">
-                        {filter
-                          ? "Try adjusting your search filter."
-                          : "No commits available for this repository."}
-                      </p>
-                    </div>
-                  )}
-                </div>
+                    )}
+
+                    {storyData ? (
+                      <CommitStoryView
+                        storyData={storyData}
+                        onRegenerate={generateCommitStory}
+                        isLoading={isGeneratingStory}
+                      />
+                    ) : (
+                      <div className="card p-8 text-center">
+                        {isGeneratingStory ? (
+                          <>
+                            <LoadingSpinner size="lg" className="mb-4" />
+                            <h3 className="text-lg font-medium text-foreground mb-2">
+                              Generating Story...
+                            </h3>
+                            <p className="text-muted-foreground">
+                              AI is analyzing the commit history to create an
+                              engaging story.
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                            <h3 className="text-lg font-medium text-foreground mb-2">
+                              No Story Available
+                            </h3>
+                            <p className="text-muted-foreground mb-4">
+                              Click the "Story View" button to generate a
+                              narrative from the commit history.
+                            </p>
+                            <button
+                              onClick={() => generateCommitStory()}
+                              className="btn-primary"
+                            >
+                              <BookOpen className="w-4 h-4 mr-2" />
+                              Generate Story
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Load More Info */}
                 {commitsResponse.commits.length >=

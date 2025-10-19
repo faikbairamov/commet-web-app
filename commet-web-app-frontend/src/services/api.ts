@@ -5,6 +5,8 @@ import type {
   Repository,
   ChatRequest,
   ChatResponse,
+  MultiProjectChatRequest,
+  MultiProjectChatResponse,
   UsersResponse,
   CreateUserRequest,
   CreateUserResponse,
@@ -321,6 +323,114 @@ export class ApiService {
     return response.data;
   }
 
+  // Multi-Project AI Chat - Ask questions about multiple connected repositories
+  static async chatWithMultipleRepositories(
+    question: string,
+    repositories: string[],
+    token?: string,
+    branch?: string,
+    commitsLimit: number = 10
+  ): Promise<MultiProjectChatResponse> {
+    // Validate parameters
+    if (repositories.length === 0) {
+      throw new Error("At least one repository must be provided");
+    }
+
+    if (repositories.length > 5) {
+      throw new Error("Maximum 5 repositories can be analyzed at once");
+    }
+
+    // Validate each repository format
+    for (const repo of repositories) {
+      if (!this.validateRepositoryFormat(repo)) {
+        throw new Error(`Invalid repository format: ${repo}. Use 'owner/repo'`);
+      }
+    }
+
+    const requestData: MultiProjectChatRequest = {
+      question,
+      repositories,
+      commits_limit: commitsLimit,
+    };
+
+    if (token) {
+      requestData.token = token;
+    }
+
+    if (branch) {
+      requestData.branch = branch;
+    }
+
+    // Create a separate axios instance with longer timeout for multi-project requests
+    const multiProjectApi = axios.create({
+      baseURL: API_BASE_URL,
+      timeout: 120000, // 2 minutes timeout for multi-project analysis
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    // Add request interceptor for logging
+    multiProjectApi.interceptors.request.use(
+      (config) => {
+        console.log(
+          `Multi-Project API Request: ${config.method?.toUpperCase()} ${
+            config.url
+          }`
+        );
+        return config;
+      },
+      (error) => {
+        console.error("Multi-Project API Request Error:", error);
+        return Promise.reject(error);
+      }
+    );
+
+    // Add response interceptor for error handling
+    multiProjectApi.interceptors.response.use(
+      (response) => {
+        return response;
+      },
+      (error) => {
+        console.error("Multi-Project API Response Error:", error);
+
+        if (error.response?.data?.error) {
+          throw new Error(error.response.data.error);
+        }
+
+        if (error.code === "ECONNABORTED") {
+          throw new Error(
+            "Request timeout - multi-project analysis is taking longer than expected. Please try again with fewer repositories or a simpler question."
+          );
+        }
+
+        if (error.response?.status === 404) {
+          throw new Error("Repository not found or not accessible");
+        }
+
+        if (error.response?.status === 401) {
+          throw new Error("Invalid or expired GitHub token");
+        }
+
+        if (error.response?.status === 403) {
+          throw new Error("Rate limit exceeded - please try again later");
+        }
+
+        if (error.response?.status === 503) {
+          throw new Error(
+            "AI service not available - please check server configuration"
+          );
+        }
+
+        throw new Error(error.message || "An unexpected error occurred");
+      }
+    );
+
+    const response: AxiosResponse<MultiProjectChatResponse> =
+      await multiProjectApi.post("/api/chat/multi-project", requestData);
+    return response.data;
+  }
+
   // GitHub OAuth Authentication
   static async initiateGitHubLogin(): Promise<AuthResponse> {
     const response: AxiosResponse<AuthResponse> = await api.get("/auth/github");
@@ -356,6 +466,55 @@ export class ApiService {
     const response: AxiosResponse<{ message: string }> = await api.post(
       "/auth/logout"
     );
+    return response.data;
+  }
+
+  // Generate commit story
+  static async generateCommitStory(
+    repository: string,
+    branch?: string,
+    token?: string,
+    commitsLimit: number = 20,
+    storyStyle: "narrative" | "technical" | "casual" = "narrative"
+  ): Promise<{
+    repository: string;
+    branch: string;
+    story_style: string;
+    total_commits_analyzed: number;
+    story: string;
+    commits_data: any[];
+    repository_info: any;
+  }> {
+    // Validate parameters
+    const validation = this.validateGitHubParams(repository, token, branch);
+    if (!validation.isValid) {
+      throw new Error(validation.error);
+    }
+
+    const requestData: any = {
+      repository,
+      commits_limit: commitsLimit,
+      story_style: storyStyle,
+    };
+
+    if (token) {
+      requestData.token = token;
+    }
+
+    if (branch) {
+      requestData.branch = branch;
+    }
+
+    const response: AxiosResponse<{
+      repository: string;
+      branch: string;
+      story_style: string;
+      total_commits_analyzed: number;
+      story: string;
+      commits_data: any[];
+      repository_info: any;
+    }> = await api.post("/api/git/commits/story", requestData);
+
     return response.data;
   }
 }

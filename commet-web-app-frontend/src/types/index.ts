@@ -39,6 +39,27 @@ export interface CommitsResponse {
   commits: Commit[];
 }
 
+export interface CommitStoryResponse {
+  repository: string;
+  branch: string;
+  story_style: string;
+  total_commits_analyzed: number;
+  story: string;
+  commits_data: Commit[];
+  repository_info: {
+    name: string;
+    full_name: string;
+    description: string;
+    language: string;
+    languages: Record<string, number>;
+    stars: number;
+    forks: number;
+    created_at: string;
+    updated_at: string;
+    default_branch: string;
+  };
+}
+
 export interface RepositoryOwner {
   login: string;
   type: string;
@@ -153,6 +174,14 @@ export interface ChatRequest {
   commits_limit?: number;
 }
 
+export interface MultiProjectChatRequest {
+  question: string;
+  repositories: string[];
+  token?: string;
+  branch?: string;
+  commits_limit?: number;
+}
+
 export interface ChatResponse {
   question: string;
   repository: string;
@@ -166,9 +195,43 @@ export interface ChatResponse {
   model_used: string;
 }
 
+export interface MultiProjectChatResponse {
+  question: string;
+  repositories: string[];
+  branch: string;
+  analysis_data: {
+    repositories_info: Repository[];
+    total_commits_analyzed: number;
+    commits_limit: number;
+    project_connections: ProjectConnection[];
+  };
+  ai_response: string;
+  model_used: string;
+}
+
+export interface ProjectConnection {
+  type:
+    | "frontend-backend"
+    | "mobile-backend"
+    | "database"
+    | "documentation"
+    | "shared-tech"
+    | "other";
+  description: string;
+  projects: string[];
+  confidence: number;
+}
+
 export interface ChatFormData {
   question: string;
   repository: string;
+  branch?: string;
+  commits_limit?: number;
+}
+
+export interface MultiProjectChatFormData {
+  question: string;
+  repositories: string[];
   branch?: string;
   commits_limit?: number;
 }

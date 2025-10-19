@@ -163,7 +163,17 @@ Focus on:
 - Recent changes and trends
 - Any other insights that can be derived from the data
 
-Answer in a clear, professional manner suitable for developers and technical stakeholders.
+**IMPORTANT FORMATTING REQUIREMENTS:**
+- Use proper markdown code blocks for ALL code, JSON, configuration files, and technical content
+- Use ```json for JSON schemas and API responses
+- Use ```bash for shell commands and installation steps
+- Use ```typescript, ```javascript, ```python, etc. for code examples
+- Use ```yaml for configuration files
+- Use ```text for data flow diagrams
+- Always wrap code examples in appropriate code blocks with language specification
+- Make API schemas, data structures, and configuration examples clearly formatted in code blocks
+
+Answer in a clear, professional manner suitable for developers and technical stakeholders with proper code formatting.
 """
         
         return prompt.strip()
@@ -200,6 +210,396 @@ Answer in a clear, professional manner suitable for developers and technical sta
             print(f"Error setting model {model_name}: {str(e)}")
             return False
     
+    def analyze_multiple_repositories(self, repositories_data: List[Dict], commits_data: List[List[Dict]], question: str, jira_data: List[Dict] = None) -> str:
+        """
+        Analyze multiple connected repositories and provide comprehensive cross-project insights
+        
+        Args:
+            repositories_data: List of repository metadata from multiple repos
+            commits_data: List of commits from each repository
+            question: User's question about the repositories
+            jira_data: Optional list of Jira project data for project management insights
+            
+        Returns:
+            AI-generated analysis with project connections and detailed instructions
+        """
+        
+        # Prepare context data for multiple repositories
+        context = self._prepare_multi_repository_context(repositories_data, commits_data, jira_data)
+        
+        # Create the prompt for multi-project analysis
+        prompt = self._create_multi_project_prompt(context, question)
+        
+        try:
+            # Call OpenAI API
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "system", 
+                        "content": "You are an expert software architect and full-stack developer. You analyze multiple connected GitHub repositories and provide comprehensive insights about how they work together, API connections, data flow, and detailed development instructions. You excel at creating complete prompts for LLM development tasks that include all necessary context from connected projects."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                max_tokens=2000,
+                temperature=0.7
+            )
+            
+            return response.choices[0].message.content.strip()
+            
+        except Exception as e:
+            return f"Error generating multi-project AI response: {str(e)}"
+    
+    def generate_commit_story(self, repo_data: Dict, commits_data: List[Dict], story_style: str = "narrative") -> str:
+        """
+        Generate a narrative story from commit history
+        
+        Args:
+            repo_data: Repository metadata
+            commits_data: List of commits with their details
+            story_style: Style of story ("narrative", "technical", "casual")
+            
+        Returns:
+            AI-generated story about the commit history
+        """
+        
+        # Prepare context data for the story
+        context = self._prepare_commit_story_context(repo_data, commits_data)
+        
+        # Create the prompt based on story style
+        prompt = self._create_commit_story_prompt(context, story_style)
+        
+        try:
+            # Call OpenAI API
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "system", 
+                        "content": self._get_commit_story_system_prompt(story_style) + " IMPORTANT: Use only simple, everyday words. No complex terms, no fancy language, no poetry. Write like you're explaining to a 12-year-old. Keep it VERY SHORT - maximum 200 words. Get straight to the point."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                max_tokens=500,
+                temperature=0.8
+            )
+            
+            return response.choices[0].message.content.strip()
+            
+        except Exception as e:
+            return f"Error generating commit story: {str(e)}"
+    
+    def _prepare_commit_story_context(self, repo_data: Dict, commits_data: List[Dict]) -> str:
+        """
+        Prepare context data from repository and commits for story generation
+        """
+        
+        context_parts = []
+        
+        # Repository overview
+        context_parts.append("=== REPOSITORY OVERVIEW ===")
+        context_parts.append(f"Name: {repo_data.get('name', 'N/A')}")
+        context_parts.append(f"Description: {repo_data.get('description', 'N/A')}")
+        context_parts.append(f"Primary Language: {repo_data.get('language', 'N/A')}")
+        context_parts.append(f"Languages: {json.dumps(repo_data.get('languages', {}), indent=2)}")
+        context_parts.append(f"Stars: {repo_data.get('stars', 0)}")
+        context_parts.append(f"Forks: {repo_data.get('forks', 0)}")
+        context_parts.append(f"Created: {repo_data.get('created_at', 'N/A')}")
+        context_parts.append(f"Last Updated: {repo_data.get('updated_at', 'N/A')}")
+        
+        # Commit history
+        context_parts.append(f"\n=== COMMIT HISTORY ({len(commits_data)} commits) ===")
+        
+        for i, commit in enumerate(commits_data):
+            context_parts.append(f"\n--- Commit {i+1} ---")
+            context_parts.append(f"SHA: {commit.get('sha', 'N/A')}")
+            context_parts.append(f"Message: {commit.get('message', 'N/A')}")
+            context_parts.append(f"Author: {commit.get('author', {}).get('name', 'N/A')}")
+            context_parts.append(f"Date: {commit.get('author', {}).get('date', 'N/A')}")
+            
+            stats = commit.get('stats', {})
+            context_parts.append(f"Changes: +{stats.get('additions', 0)} -{stats.get('deletions', 0)} ({stats.get('total', 0)} total)")
+            
+            # Include file changes if available
+            if 'file_changes' in commit and commit['file_changes']:
+                context_parts.append(f"Files Changed: {len(commit['file_changes'])}")
+                for file_change in commit['file_changes'][:3]:  # Limit to 3 files per commit
+                    context_parts.append(f"  - {file_change.get('filename', 'N/A')} ({file_change.get('status', 'N/A')})")
+        
+        return "\n".join(context_parts)
+    
+    def _create_commit_story_prompt(self, context: str, story_style: str) -> str:
+        """
+        Create the prompt for commit story generation based on style
+        """
+        
+        style_instructions = {
+            "narrative": "Write this as a simple story about how the project was built. Use everyday words and short sentences. Tell it like you're explaining to someone who doesn't know much about coding. Focus on what the developers did and why they did it.",
+            
+            "technical": "Write this as a straightforward technical summary. Use simple terms to explain what code was written, what files were changed, and how the project works. Avoid complex jargon and explain things clearly.",
+            
+            "casual": "Write this like you're talking to a friend about what happened in the project. Use simple words, short sentences, and everyday language. Make it easy to understand what the developers were working on."
+        }
+        
+        instruction = style_instructions.get(story_style, style_instructions["narrative"])
+        
+        return f"""Based on the following repository and commit history data, create a simple story about how this project was built.
+
+{instruction}
+
+Here's the data to work with:
+
+{context}
+
+Please create a story that:
+1. Uses simple, everyday words
+2. Has short, easy-to-read sentences
+3. Explains what the developers did in plain language
+4. Shows how the project changed over time
+5. Is easy for anyone to understand
+
+Make it SHORT - only 150-250 words maximum. Get to the point quickly and keep it brief."""
+    
+    def _get_commit_story_system_prompt(self, story_style: str) -> str:
+        """
+        Get the system prompt based on story style
+        """
+        
+        base_prompt = "You are a clear and simple writer who explains software development in everyday language. You help people understand how projects are built by using simple words and short sentences."
+        
+        style_additions = {
+            "narrative": " You tell simple stories about how projects are built. Use everyday words and explain things step by step.",
+            
+            "technical": " You explain technical things in simple terms. Break down complex ideas into easy-to-understand parts.",
+            
+            "casual": " You write like you're talking to a friend. Use simple words and make everything easy to understand."
+        }
+        
+        return base_prompt + style_additions.get(story_style, style_additions["narrative"])
+    
+    def _prepare_multi_repository_context(self, repositories_data: List[Dict], commits_data: List[List[Dict]], jira_data: List[Dict] = None) -> str:
+        """
+        Prepare context data from multiple repositories and their commits
+        
+        Args:
+            repositories_data: List of repository metadata
+            commits_data: List of commits from each repository
+            jira_data: Optional list of Jira project data
+            
+        Returns:
+            Formatted context string for multi-project analysis
+        """
+        
+        context_parts = []
+        
+        # Overall project overview
+        context_parts.append("=== MULTI-PROJECT ANALYSIS ===")
+        context_parts.append(f"Total repositories analyzed: {len(repositories_data)}")
+        
+        # Analyze each repository
+        for i, (repo_data, repo_commits) in enumerate(zip(repositories_data, commits_data)):
+            context_parts.append(f"\n=== REPOSITORY {i+1}: {repo_data.get('name', 'N/A')} ===")
+            context_parts.append(f"Full Name: {repo_data.get('full_name', 'N/A')}")
+            context_parts.append(f"Description: {repo_data.get('description', 'N/A')}")
+            context_parts.append(f"Language: {repo_data.get('language', 'N/A')}")
+            context_parts.append(f"Languages: {json.dumps(repo_data.get('languages', {}), indent=2)}")
+            context_parts.append(f"Stars: {repo_data.get('stars', 0)}")
+            context_parts.append(f"Forks: {repo_data.get('forks', 0)}")
+            context_parts.append(f"Default Branch: {repo_data.get('default_branch', 'N/A')}")
+            context_parts.append(f"Private: {repo_data.get('is_private', False)}")
+            
+            if 'owner' in repo_data:
+                context_parts.append(f"Owner: {repo_data['owner'].get('login', 'N/A')} ({repo_data['owner'].get('type', 'N/A')})")
+            
+            # Recent commits for this repository (optimized for performance)
+            if repo_commits:
+                context_parts.append(f"\n--- Recent Commits for {repo_data.get('name', 'N/A')} ---")
+                for j, commit in enumerate(repo_commits[:3]):  # Limit to 3 most recent commits per repo
+                    context_parts.append(f"\nCommit {j+1}:")
+                    context_parts.append(f"  SHA: {commit.get('sha', 'N/A')}")
+                    context_parts.append(f"  Message: {commit.get('message', 'N/A')}")
+                    context_parts.append(f"  Author: {commit.get('author', {}).get('name', 'N/A')}")
+                    context_parts.append(f"  Date: {commit.get('author', {}).get('date', 'N/A')}")
+                    
+                    stats = commit.get('stats', {})
+                    context_parts.append(f"  Changes: +{stats.get('additions', 0)} -{stats.get('deletions', 0)} ({stats.get('total', 0)} total)")
+                    
+                    # Include file changes if available (only for first 2 commits)
+                    if j < 2 and 'file_changes' in commit and commit['file_changes']:
+                        context_parts.append(f"  Files Changed: {len(commit['file_changes'])}")
+                        for file_change in commit['file_changes'][:2]:  # Limit to 2 files per commit
+                            context_parts.append(f"    - {file_change.get('filename', 'N/A')} ({file_change.get('status', 'N/A')})")
+                            if file_change.get('patch'):
+                                # Include a snippet of the actual code changes (truncated)
+                                patch_content = file_change['patch']
+                                if len(patch_content) > 200:
+                                    patch_content = patch_content[:200] + "..."
+                                context_parts.append(f"      Code Changes: {patch_content}")
+        
+        # Cross-repository analysis
+        context_parts.append(f"\n=== CROSS-REPOSITORY ANALYSIS ===")
+        
+        # Detect project types
+        project_types = []
+        for repo_data in repositories_data:
+            name = (repo_data.get('name') or '').lower()
+            description = (repo_data.get('description') or '').lower()
+            
+            if any(keyword in name or keyword in description for keyword in ['frontend', 'client', 'ui', 'react', 'vue', 'angular']):
+                project_types.append('Frontend')
+            elif any(keyword in name or keyword in description for keyword in ['backend', 'api', 'server', 'node', 'express', 'django', 'flask']):
+                project_types.append('Backend')
+            elif any(keyword in name or keyword in description for keyword in ['mobile', 'app', 'ios', 'android', 'react-native']):
+                project_types.append('Mobile')
+            elif any(keyword in name or keyword in description for keyword in ['database', 'db', 'sql', 'mongo']):
+                project_types.append('Database')
+            elif any(keyword in name or keyword in description for keyword in ['docs', 'documentation']):
+                project_types.append('Documentation')
+            else:
+                project_types.append('Other')
+        
+        context_parts.append(f"Detected Project Types: {', '.join(project_types)}")
+        
+        # Analyze technology overlap
+        all_languages = []
+        for repo_data in repositories_data:
+            languages = repo_data.get('languages', {})
+            all_languages.extend(languages.keys())
+        
+        unique_languages = list(set(all_languages))
+        context_parts.append(f"Technologies Used: {', '.join(unique_languages)}")
+        
+        # Detect potential connections
+        connections = []
+        if 'Frontend' in project_types and 'Backend' in project_types:
+            connections.append('Frontend-Backend API Integration')
+        if 'Mobile' in project_types and 'Backend' in project_types:
+            connections.append('Mobile-Backend API Integration')
+        if 'Database' in project_types:
+            connections.append('Database Integration')
+        if 'Documentation' in project_types:
+            connections.append('Documentation & Code Alignment')
+        
+        if connections:
+            context_parts.append(f"Potential Connections: {', '.join(connections)}")
+        
+        # Add Jira project management data if available
+        if jira_data:
+            context_parts.append("\n=== JIRA PROJECT MANAGEMENT DATA ===")
+            for jira_project in jira_data:
+                project_key = jira_project['project_key']
+                history = jira_project['history']
+                stats = history.get('ticket_statistics', {})
+                breakdown = history.get('breakdown', {})
+                
+                context_parts.append(f"\n**Project {project_key}:**")
+                context_parts.append(f"- Total tickets: {stats.get('total_tickets', 0)}")
+                context_parts.append(f"- Created in period: {stats.get('created_in_period', 0)}")
+                context_parts.append(f"- Updated in period: {stats.get('updated_in_period', 0)}")
+                context_parts.append(f"- Recent activity: {stats.get('recent_activity', 0)}")
+                
+                # Add issue type breakdown
+                issue_types = breakdown.get('issue_types', {})
+                if issue_types:
+                    context_parts.append(f"- Issue types: {', '.join([f'{k}({v})' for k, v in issue_types.items()])}")
+                
+                # Add status breakdown
+                statuses = breakdown.get('statuses', {})
+                if statuses:
+                    context_parts.append(f"- Statuses: {', '.join([f'{k}({v})' for k, v in statuses.items()])}")
+                
+                # Add recent tickets
+                recent_tickets = history.get('recent_tickets', [])
+                if recent_tickets:
+                    context_parts.append(f"- Recent tickets: {', '.join([ticket.get('key', 'N/A') for ticket in recent_tickets[:5]])}")
+        
+        return "\n".join(context_parts)
+    
+    def _create_multi_project_prompt(self, context: str, question: str) -> str:
+        """
+        Create a prompt for multi-project analysis
+        
+        Args:
+            context: Multi-repository context
+            question: User's question
+            
+        Returns:
+            Formatted prompt for multi-project analysis
+        """
+        
+        prompt = f"""
+You are analyzing multiple connected GitHub repositories. Based on the repository data provided, please provide a comprehensive analysis that answers the user's question.
+
+REPOSITORY DATA:
+{context}
+
+USER QUESTION: {question}
+
+Please provide a detailed analysis that includes:
+
+1. **Project Overview & Connections**
+   - How these projects relate to each other
+   - What type of system architecture they form
+   - Key integration points and dependencies
+
+2. **Technical Analysis**
+   - Technology stack across all projects
+   - API patterns and data flow
+   - Shared components or services
+   - Database schemas and data models
+
+3. **Development Instructions**
+   - Step-by-step integration guide
+   - API endpoint documentation
+   - Data flow diagrams (in text format)
+   - Configuration requirements
+
+4. **Complete LLM Development Prompts**
+   - Ready-to-use prompts for frontend development that include backend context
+   - API schema documentation for each endpoint
+   - Data structure definitions
+   - Integration patterns and best practices
+
+5. **Cross-Project Insights**
+   - How to adapt one project to work with another
+   - Common patterns and conventions
+   - Potential issues and solutions
+   - Scalability considerations
+
+6. **Project Management Integration** (if Jira data is available)
+   - Project health and status analysis
+   - Workload distribution and team capacity
+   - Ticket trends and development velocity
+   - Risk assessment and bottleneck identification
+   - Recommendations for project management improvements
+
+**IMPORTANT FORMATTING REQUIREMENTS:**
+- Use proper markdown code blocks for ALL code, JSON, configuration files, and technical content
+- Use ```json for JSON schemas and API responses
+- Use ```bash for shell commands and installation steps
+- Use ```typescript, ```javascript, ```python, etc. for code examples
+- Use ```yaml for configuration files
+- Use ```text for data flow diagrams
+- Always wrap code examples in appropriate code blocks with language specification
+- Make API schemas, data structures, and configuration examples clearly formatted in code blocks
+
+Focus on providing actionable, detailed instructions that would enable someone without deep knowledge of the codebase to:
+- Understand how the projects work together
+- Integrate them successfully
+- Develop new features that work across projects
+- Use the information to create complete prompts for AI-assisted development
+
+Make the response practical and immediately useful for development tasks with proper code formatting.
+"""
+        
+        return prompt.strip()
+
     def analyze_jira_project_history(self, project_history: Dict[str, Any]) -> str:
         """
         Analyze Jira project history and provide comprehensive insights

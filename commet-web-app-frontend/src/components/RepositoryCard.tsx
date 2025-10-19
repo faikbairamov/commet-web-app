@@ -19,9 +19,9 @@ const RepositoryCard: React.FC<RepositoryCardProps> = ({
               {repository.name}
             </h3>
             {repository.is_private ? (
-              <Lock className="h-4 w-4 text-gray-500 flex-shrink-0" />
+              <Lock className="h-4 w-4 text-yellow-400 flex-shrink-0" />
             ) : (
-              <Globe className="h-4 w-4 text-gray-500 flex-shrink-0" />
+              <Globe className="h-4 w-4 text-green-400 flex-shrink-0" />
             )}
           </div>
           <p className="text-sm text-muted-foreground mb-2">
@@ -44,7 +44,7 @@ const RepositoryCard: React.FC<RepositoryCardProps> = ({
           </span>
         </div>
         <div className="flex items-center space-x-1">
-          <GitFork className="h-4 w-4 text-gray-500" />
+          <GitFork className="h-4 w-4 text-gray-400" />
           <span className="text-sm text-muted-foreground">
             {formatNumber(repository.forks)}
           </span>

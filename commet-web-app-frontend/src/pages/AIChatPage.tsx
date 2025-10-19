@@ -1,5 +1,5 @@
 import React from "react";
-import AIChatForm from "../components/AIChatForm";
+import EnhancedAIChatForm from "../components/EnhancedAIChatForm";
 import { Bot } from "lucide-react";
 
 const AIChatPage: React.FC = () => {
@@ -16,13 +16,14 @@ const AIChatPage: React.FC = () => {
             AI Repository Analysis
           </h1>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Get intelligent insights about any GitHub repository. Ask questions
-            about code patterns, development activity, technologies used, and
-            more.
+            Get intelligent insights about GitHub repositories. Analyze single
+            projects or multiple connected projects to understand how they work
+            together, API connections, and get detailed development
+            instructions.
           </p>
         </div>
 
-        <AIChatForm />
+        <EnhancedAIChatForm />
 
         <div className="mt-12 card p-8">
           <h2 className="text-xl font-semibold text-foreground mb-4">
@@ -34,11 +35,12 @@ const AIChatPage: React.FC = () => {
                 <span className="text-primary-foreground font-bold">1</span>
               </div>
               <h3 className="text-lg font-medium text-foreground mb-2">
-                Enter Repository
+                Select Projects
               </h3>
               <p className="text-muted-foreground text-sm">
-                Provide the GitHub repository in owner/repo format and
-                optionally specify a branch.
+                Choose single repository or multiple connected projects
+                (frontend, backend, etc.) to analyze their relationships and
+                integration patterns.
               </p>
             </div>
             <div className="text-center">
@@ -49,8 +51,8 @@ const AIChatPage: React.FC = () => {
                 Ask Questions
               </h3>
               <p className="text-muted-foreground text-sm">
-                Ask any question about the repository, its code, contributors,
-                or development patterns.
+                Ask about code patterns, API connections, integration
+                instructions, or how projects work together.
               </p>
             </div>
             <div className="text-center">
@@ -61,8 +63,8 @@ const AIChatPage: React.FC = () => {
                 Get AI Insights
               </h3>
               <p className="text-muted-foreground text-sm">
-                Receive detailed AI-powered analysis based on repository data
-                and recent commits.
+                Receive comprehensive analysis with detailed instructions, API
+                schemas, and complete prompts for development tasks.
               </p>
             </div>
           </div>
@@ -75,7 +77,7 @@ const AIChatPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <h3 className="text-lg font-medium text-foreground mb-2">
-                Technical Analysis
+                Single Project Analysis
               </h3>
               <ul className="text-muted-foreground text-sm space-y-1">
                 <li>• What programming languages are used?</li>
@@ -86,35 +88,37 @@ const AIChatPage: React.FC = () => {
             </div>
             <div>
               <h3 className="text-lg font-medium text-foreground mb-2">
-                Development Activity
+                Multi-Project Analysis
               </h3>
               <ul className="text-muted-foreground text-sm space-y-1">
-                <li>• Who are the main contributors?</li>
-                <li>• What is the commit frequency pattern?</li>
-                <li>• What are the recent changes and trends?</li>
-                <li>• How active is the development?</li>
+                <li>• How do these projects work together and connect?</li>
+                <li>• What are the API endpoints and schemas?</li>
+                <li>• How can I integrate projects for a complete app?</li>
+                <li>• What are the data flow patterns between projects?</li>
+                <li>• How do I set up the development environment?</li>
+                <li>• What are the shared dependencies and technologies?</li>
               </ul>
             </div>
             <div>
               <h3 className="text-lg font-medium text-foreground mb-2">
-                Project Insights
+                Development Instructions
               </h3>
               <ul className="text-muted-foreground text-sm space-y-1">
-                <li>• What is the project about?</li>
-                <li>• What are the main features?</li>
-                <li>• How mature is the codebase?</li>
-                <li>• What is the development workflow?</li>
+                <li>• Complete prompts for LLM development</li>
+                <li>• API schema documentation</li>
+                <li>• Integration step-by-step guides</li>
+                <li>• Code adaptation instructions</li>
               </ul>
             </div>
             <div>
               <h3 className="text-lg font-medium text-foreground mb-2">
-                Code Quality
+                Project Health & Quality
               </h3>
               <ul className="text-muted-foreground text-sm space-y-1">
-                <li>• What is the code quality like?</li>
-                <li>• Are there any patterns or best practices?</li>
-                <li>• What are the recent improvements?</li>
-                <li>• How is testing handled?</li>
+                <li>• Development activity patterns</li>
+                <li>• Code quality assessment</li>
+                <li>• Recent changes and trends</li>
+                <li>• Best practices and recommendations</li>
               </ul>
             </div>
           </div>

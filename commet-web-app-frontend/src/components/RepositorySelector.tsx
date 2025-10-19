@@ -135,11 +135,11 @@ const RepositorySelector: React.FC<RepositorySelectorProps> = ({
                         </span>
                       )}
                       <span className="flex items-center space-x-1">
-                        <Star className="w-3 h-3" />
+                        <Star className="w-3 h-3 text-yellow-400" />
                         <span>{repo.stars}</span>
                       </span>
                       <span className="flex items-center space-x-1">
-                        <GitFork className="w-3 h-3" />
+                        <GitFork className="w-3 h-3 text-gray-400" />
                         <span>{repo.forks}</span>
                       </span>
                     </div>

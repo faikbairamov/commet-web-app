@@ -822,6 +822,412 @@ def chat_with_repository():
     except Exception as e:
         return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
 
+# Multi-Project AI Chat endpoint for analyzing multiple connected repositories
+@app.route('/api/chat/multi-project', methods=['POST'])
+def chat_with_multiple_repositories():
+    """
+    Answer questions about multiple connected GitHub repositories using AI analysis.
+    
+    Request Body:
+    {
+        "question": "How do these projects work together?",
+        "repositories": ["owner/frontend-repo", "owner/backend-repo"],
+        "token": "optional_github_token",
+        "branch": "optional_branch_name",
+        "commits_limit": 10
+    }
+    """
+    try:
+        # Check if AI service is available
+        if not ai_service:
+            return jsonify({"error": "AI service not available. Please check OPENAI_API_KEY environment variable."}), 503
+        
+        # Get request data
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Request body must be JSON"}), 400
+        
+        question = data.get('question')
+        repositories = data.get('repositories', [])
+        token = data.get('token')
+        branch = data.get('branch')
+        commits_limit = data.get('commits_limit', 10)
+        jira_projects = data.get('jira_projects', [])  # New: Jira project keys
+        include_jira_analysis = data.get('include_jira_analysis', False)
+        
+        # Validate required parameters
+        if not question:
+            return jsonify({"error": "Question parameter is required"}), 400
+        
+        if not repositories and not jira_projects:
+            return jsonify({"error": "At least one repository or Jira project is required"}), 400
+        
+        if len(repositories) > 5:
+            return jsonify({"error": "Maximum 5 repositories can be analyzed at once"}), 400
+        
+        # Initialize GitHub client
+        if token:
+            g = Github(token)
+        else:
+            g = Github()  # Use unauthenticated access (rate limited)
+        
+        # Collect data from all repositories
+        repositories_data = []
+        all_commits_data = []
+        project_connections = []
+        jira_data = []
+        
+        for repo_name in repositories:
+            try:
+                # Get repository information
+                repo = g.get_repo(repo_name)
+                
+                # Get repository metadata
+                repo_data = {
+                    "name": repo.name,
+                    "full_name": repo.full_name,
+                    "description": repo.description,
+                    "url": repo.html_url,
+                    "language": repo.language,
+                    "languages": repo.get_languages(),
+                    "stars": repo.stargazers_count,
+                    "forks": repo.forks_count,
+                    "watchers": repo.watchers_count,
+                    "open_issues": repo.open_issues_count,
+                    "created_at": repo.created_at.isoformat(),
+                    "updated_at": repo.updated_at.isoformat(),
+                    "pushed_at": repo.pushed_at.isoformat() if repo.pushed_at else None,
+                    "default_branch": repo.default_branch,
+                    "is_private": repo.private,
+                    "owner": {
+                        "login": repo.owner.login,
+                        "type": repo.owner.type,
+                        "avatar_url": repo.owner.avatar_url,
+                        "url": repo.owner.html_url
+                    }
+                }
+                repositories_data.append(repo_data)
+                
+                # Get commits data for this repository (optimized for performance)
+                try:
+                    if branch:
+                        commits = repo.get_commits(sha=branch)
+                    else:
+                        commits = repo.get_commits()  # Default branch
+                    
+                    commits_data = []
+                    for i, commit in enumerate(commits):
+                        if i >= commits_limit:
+                            break
+                        
+                        commit_data = {
+                            "sha": commit.sha,
+                            "message": commit.commit.message,
+                            "author": {
+                                "name": commit.commit.author.name,
+                                "email": commit.commit.author.email,
+                                "date": commit.commit.author.date.isoformat()
+                            },
+                            "committer": {
+                                "name": commit.commit.committer.name,
+                                "email": commit.commit.committer.email,
+                                "date": commit.commit.committer.date.isoformat()
+                            },
+                            "url": commit.html_url,
+                            "stats": {
+                                "additions": commit.stats.additions if commit.stats else 0,
+                                "deletions": commit.stats.deletions if commit.stats else 0,
+                                "total": commit.stats.total if commit.stats else 0
+                            }
+                        }
+                        
+                        # Only get detailed file changes for the first 3 commits to reduce API calls
+                        if i < 3:
+                            try:
+                                full_commit = repo.get_commit(commit.sha)
+                                file_changes = []
+                                for file in full_commit.files[:10]:  # Limit to 10 files per commit
+                                    file_change = {
+                                        "filename": file.filename,
+                                        "status": file.status,
+                                        "additions": file.additions,
+                                        "deletions": file.deletions,
+                                        "changes": file.changes
+                                    }
+                                    # Only include patch data for the first 2 commits to reduce payload size
+                                    if i < 2 and hasattr(file, 'patch') and file.patch:
+                                        # Truncate patch to first 500 characters to reduce size
+                                        patch_content = file.patch[:500] + "..." if len(file.patch) > 500 else file.patch
+                                        file_change["patch"] = patch_content
+                                    file_changes.append(file_change)
+                                commit_data["file_changes"] = file_changes
+                            except Exception as e:
+                                print(f"Warning: Could not get detailed commit info for {commit.sha}: {str(e)}")
+                                # If we can't get file changes, continue without them
+                                pass
+                        
+                        commits_data.append(commit_data)
+                    
+                    all_commits_data.append(commits_data)
+                    
+                except Exception as e:
+                    print(f"Warning: Could not fetch commits for {repo_name}: {str(e)}")
+                    all_commits_data.append([])
+                    
+            except Exception as e:
+                return jsonify({"error": f"Repository not found or not accessible: {repo_name} - {str(e)}"}), 404
+        
+        # Process Jira projects if requested
+        if include_jira_analysis and jira_integration and jira_projects:
+            for project_key in jira_projects:
+                try:
+                    # Get Jira project history
+                    project_history = jira_integration.get_project_history(project_key, days_back=30)
+                    if project_history:
+                        jira_data.append({
+                            'project_key': project_key,
+                            'history': project_history
+                        })
+                        
+                        # Add Jira project type to analysis
+                        project_types.append(f'Jira Project ({project_key})')
+                        
+                except Exception as e:
+                    print(f"Error processing Jira project {project_key}: {str(e)}")
+                    continue
+        
+        # Analyze project connections
+        project_types = []
+        for repo_data in repositories_data:
+            name = (repo_data.get('name') or '').lower()
+            description = (repo_data.get('description') or '').lower()
+            
+            if any(keyword in name or keyword in description for keyword in ['frontend', 'client', 'ui', 'react', 'vue', 'angular']):
+                project_types.append('Frontend')
+            elif any(keyword in name or keyword in description for keyword in ['backend', 'api', 'server', 'node', 'express', 'django', 'flask']):
+                project_types.append('Backend')
+            elif any(keyword in name or keyword in description for keyword in ['mobile', 'app', 'ios', 'android', 'react-native']):
+                project_types.append('Mobile')
+            elif any(keyword in name or keyword in description for keyword in ['database', 'db', 'sql', 'mongo']):
+                project_types.append('Database')
+            elif any(keyword in name or keyword in description for keyword in ['docs', 'documentation']):
+                project_types.append('Documentation')
+            else:
+                project_types.append('Other')
+        
+        # Detect connections
+        if 'Frontend' in project_types and 'Backend' in project_types:
+            project_connections.append({
+                "type": "frontend-backend",
+                "description": "Frontend-Backend API Integration",
+                "projects": [repo for repo, ptype in zip(repositories, project_types) if ptype in ['Frontend', 'Backend']],
+                "confidence": 0.9
+            })
+        
+        if 'Mobile' in project_types and 'Backend' in project_types:
+            project_connections.append({
+                "type": "mobile-backend",
+                "description": "Mobile-Backend API Integration",
+                "projects": [repo for repo, ptype in zip(repositories, project_types) if ptype in ['Mobile', 'Backend']],
+                "confidence": 0.9
+            })
+        
+        if 'Database' in project_types:
+            project_connections.append({
+                "type": "database",
+                "description": "Database Integration",
+                "projects": [repo for repo, ptype in zip(repositories, project_types) if ptype == 'Database'],
+                "confidence": 0.8
+            })
+        
+        # Add Jira project management connection if Jira data is available
+        if jira_data:
+            project_connections.append({
+                "type": "project-management",
+                "description": "Project Management Integration",
+                "projects": [data['project_key'] for data in jira_data],
+                "confidence": 0.9
+            })
+        
+        # Use AI service to analyze multiple repositories
+        try:
+            ai_response = ai_service.analyze_multiple_repositories(repositories_data, all_commits_data, question, jira_data=jira_data)
+            
+            response_data = {
+                "question": question,
+                "repositories": repositories,
+                "branch": branch if branch else "default",
+                "analysis_data": {
+                    "repositories_info": repositories_data,
+                    "total_commits_analyzed": sum(len(commits) for commits in all_commits_data),
+                    "commits_limit": commits_limit,
+                    "project_connections": project_connections
+                },
+                "ai_response": ai_response,
+                "model_used": ai_service.model
+            }
+            
+            # Include Jira data in response if available
+            if jira_data:
+                response_data["jira_projects"] = [data['project_key'] for data in jira_data]
+                response_data["jira_summary"] = {
+                    "total_projects": len(jira_data),
+                    "total_tickets": sum(len(data['history'].get('all_tickets', [])) for data in jira_data),
+                    "recent_activity": sum(data['history'].get('ticket_statistics', {}).get('recent_activity', 0) for data in jira_data)
+                }
+            
+            return jsonify(response_data)
+            
+        except Exception as e:
+            return jsonify({"error": f"Error generating AI response: {str(e)}"}), 500
+            
+    except Exception as e:
+        return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
+
+# Commit story endpoint - Generate a narrative story from commit history
+@app.route('/api/git/commits/story', methods=['POST'])
+def generate_commit_story():
+    """
+    Generate a narrative story from commit history using AI.
+    
+    Request Body:
+    {
+        "repository": "owner/repo",
+        "branch": "main",
+        "token": "optional_github_token",
+        "commits_limit": 20,
+        "story_style": "narrative" | "technical" | "casual"
+    }
+    """
+    try:
+        # Check if AI service is available
+        if not ai_service:
+            return jsonify({"error": "AI service not available. Please check OPENAI_API_KEY environment variable."}), 503
+        
+        # Get request data
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Request body must be JSON"}), 400
+        
+        repository = data.get('repository')
+        branch = data.get('branch')
+        token = data.get('token')
+        commits_limit = data.get('commits_limit', 20)
+        story_style = data.get('story_style', 'narrative')
+        
+        # Validate required parameters
+        if not repository:
+            return jsonify({"error": "Repository parameter is required"}), 400
+        
+        if commits_limit > 50:
+            commits_limit = 50  # Limit for performance
+        if commits_limit < 5:
+            commits_limit = 5
+        
+        # Initialize GitHub client
+        if token:
+            g = Github(token)
+        else:
+            g = Github()  # Use unauthenticated access (rate limited)
+        
+        # Get repository
+        try:
+            repo = g.get_repo(repository)
+        except Exception as e:
+            return jsonify({"error": f"Repository not found or not accessible: {str(e)}"}), 404
+        
+        # Get commits data
+        try:
+            if branch:
+                commits = repo.get_commits(sha=branch)
+            else:
+                commits = repo.get_commits()  # Default branch
+            
+            commits_data = []
+            for i, commit in enumerate(commits):
+                if i >= commits_limit:
+                    break
+                
+                commit_data = {
+                    "sha": commit.sha,
+                    "message": commit.commit.message,
+                    "author": {
+                        "name": commit.commit.author.name,
+                        "email": commit.commit.author.email,
+                        "date": commit.commit.author.date.isoformat()
+                    },
+                    "committer": {
+                        "name": commit.commit.committer.name,
+                        "email": commit.commit.committer.email,
+                        "date": commit.commit.committer.date.isoformat()
+                    },
+                    "url": commit.html_url,
+                    "stats": {
+                        "additions": commit.stats.additions if commit.stats else 0,
+                        "deletions": commit.stats.deletions if commit.stats else 0,
+                        "total": commit.stats.total if commit.stats else 0
+                    }
+                }
+                
+                # Get basic file changes for context (limited for performance)
+                try:
+                    full_commit = repo.get_commit(commit.sha)
+                    file_changes = []
+                    for file in full_commit.files[:5]:  # Limit to 5 files per commit
+                        file_change = {
+                            "filename": file.filename,
+                            "status": file.status,
+                            "additions": file.additions,
+                            "deletions": file.deletions,
+                            "changes": file.changes
+                        }
+                        file_changes.append(file_change)
+                    commit_data["file_changes"] = file_changes
+                except:
+                    # If we can't get file changes, continue without them
+                    pass
+                
+                commits_data.append(commit_data)
+            
+            # Get repository metadata for context
+            repo_data = {
+                "name": repo.name,
+                "full_name": repo.full_name,
+                "description": repo.description,
+                "language": repo.language,
+                "languages": repo.get_languages(),
+                "stars": repo.stargazers_count,
+                "forks": repo.forks_count,
+                "created_at": repo.created_at.isoformat(),
+                "updated_at": repo.updated_at.isoformat(),
+                "default_branch": repo.default_branch
+            }
+            
+            # Generate story using AI service
+            try:
+                story = ai_service.generate_commit_story(repo_data, commits_data, story_style)
+                
+                response_data = {
+                    "repository": repository,
+                    "branch": branch if branch else "default",
+                    "story_style": story_style,
+                    "total_commits_analyzed": len(commits_data),
+                    "story": story,
+                    "commits_data": commits_data,  # Include original data for reference
+                    "repository_info": repo_data
+                }
+                
+                return jsonify(response_data)
+                
+            except Exception as e:
+                return jsonify({"error": f"Error generating commit story: {str(e)}"}), 500
+                
+        except Exception as e:
+            return jsonify({"error": f"Error fetching commits: {str(e)}"}), 500
+            
+    except Exception as e:
+        return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
+
 # Repository branches endpoint
 @app.route('/api/git/branches', methods=['GET'])
 def get_repo_branches():
@@ -1233,6 +1639,31 @@ def get_jira_project_history():
         
     except Exception as e:
         return jsonify({"error": f"Error retrieving project history: {str(e)}"}), 500
+
+@app.route('/api/integrations/jira/projects', methods=['GET'])
+def get_available_jira_projects():
+    """
+    Get list of available Jira projects for analysis
+    """
+    try:
+        if not jira_integration:
+            return jsonify({"error": "Jira integration not configured"}), 400
+        
+        # This would typically query Jira for available projects
+        # For now, return a demo list
+        demo_projects = [
+            {"key": "COMM", "name": "Commet Project", "description": "Main project management"},
+            {"key": "DEV", "name": "Development", "description": "Development tasks and features"},
+            {"key": "BUG", "name": "Bug Tracking", "description": "Bug reports and fixes"},
+        ]
+        
+        return jsonify({
+            "message": "Available Jira projects",
+            "projects": demo_projects
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Error getting Jira projects: {str(e)}"}), 500
 
 @app.route('/api/integrations/jira/project-analysis', methods=['POST'])
 def analyze_jira_project():
