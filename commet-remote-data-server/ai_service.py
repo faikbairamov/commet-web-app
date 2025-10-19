@@ -279,7 +279,7 @@ Answer in a clear, professional manner suitable for developers and technical sta
                 messages=[
                     {
                         "role": "system", 
-                        "content": self._get_commit_story_system_prompt(story_style) + " IMPORTANT: Use only simple, everyday words. No complex terms, no fancy language, no poetry. Write like you're explaining to a 12-year-old. Keep it VERY SHORT - maximum 200 words. Get straight to the point."
+                        "content": self._get_commit_story_system_prompt(story_style) + " IMPORTANT: Use formal, professional business language. No storytelling phrases like 'once upon a time' or casual language. Write for corporate executives and stakeholders. Keep it VERY SHORT - maximum 200 words. Present facts and achievements professionally."
                     },
                     {
                         "role": "user",
@@ -340,16 +340,16 @@ Answer in a clear, professional manner suitable for developers and technical sta
         """
         
         style_instructions = {
-            "narrative": "Write this as a simple story about how the project was built. Use everyday words and short sentences. Tell it like you're explaining to someone who doesn't know much about coding. Focus on what the developers did and why they did it.",
+            "narrative": "Write this as a professional project summary. Use formal business language and short sentences. Present the development timeline and key milestones in a corporate style. Focus on what was accomplished and the business value delivered.",
             
-            "technical": "Write this as a straightforward technical summary. Use simple terms to explain what code was written, what files were changed, and how the project works. Avoid complex jargon and explain things clearly.",
+            "technical": "Write this as a technical project report. Use professional terminology to explain the codebase evolution, architectural decisions, and development progress. Present findings in a structured, analytical manner.",
             
-            "casual": "Write this like you're talking to a friend about what happened in the project. Use simple words, short sentences, and everyday language. Make it easy to understand what the developers were working on."
+            "casual": "Write this as a professional project update. Use clear, direct language to explain the development progress and key achievements. Present information in a business-friendly format."
         }
         
         instruction = style_instructions.get(story_style, style_instructions["narrative"])
         
-        return f"""Based on the following repository and commit history data, create a simple story about how this project was built.
+        return f"""Based on the following repository and commit history data, create a professional project summary.
 
 {instruction}
 
@@ -357,28 +357,28 @@ Here's the data to work with:
 
 {context}
 
-Please create a story that:
-1. Uses simple, everyday words
-2. Has short, easy-to-read sentences
-3. Explains what the developers did in plain language
-4. Shows how the project changed over time
-5. Is easy for anyone to understand
+Please create a summary that:
+1. Uses formal, professional language
+2. Has short, clear sentences
+3. Explains development progress in business terms
+4. Shows project evolution and milestones
+5. Is suitable for corporate reporting
 
-Make it SHORT - only 150-250 words maximum. Get to the point quickly and keep it brief."""
+Make it SHORT - only 150-250 words maximum. Use formal business language and avoid storytelling phrases."""
     
     def _get_commit_story_system_prompt(self, story_style: str) -> str:
         """
         Get the system prompt based on story style
         """
         
-        base_prompt = "You are a clear and simple writer who explains software development in everyday language. You help people understand how projects are built by using simple words and short sentences."
+        base_prompt = "You are a professional technical writer who creates formal project summaries for corporate environments. You present development progress in business language suitable for executive reporting."
         
         style_additions = {
-            "narrative": " You tell simple stories about how projects are built. Use everyday words and explain things step by step.",
+            "narrative": " You create professional project summaries with formal business language. Present development milestones and achievements in a corporate style.",
             
-            "technical": " You explain technical things in simple terms. Break down complex ideas into easy-to-understand parts.",
+            "technical": " You write technical project reports using professional terminology. Present architectural decisions and development progress in a structured, analytical format.",
             
-            "casual": " You write like you're talking to a friend. Use simple words and make everything easy to understand."
+            "casual": " You create professional project updates using clear, direct business language. Present information in a corporate-friendly format."
         }
         
         return base_prompt + style_additions.get(story_style, style_additions["narrative"])
