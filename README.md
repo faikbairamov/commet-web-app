@@ -26,6 +26,9 @@ Commet is a comprehensive platform that bridges the gap between your code and ac
 - **Code Diff Visualization**: See exactly what changed with syntax-highlighted diffs
 - **Contributor Insights**: Track individual and team contributions
 - **Commit Statistics**: Analyze additions, deletions, and change patterns
+- **📖 Commit Stories**: Transform commit history into engaging narratives with AI-powered storytelling
+- **Multiple View Modes**: Switch between detailed list view and story view
+- **Story Styles**: Choose from narrative, technical, or casual storytelling approaches
 
 ### 👥 **Team Collaboration Tools**
 
@@ -59,6 +62,34 @@ Commet is a comprehensive platform that bridges the gap between your code and ac
 ## 🏗️ Architecture
 
 Commet consists of two main components:
+
+### **Project Structure**
+
+```
+commet-web-app/
+├── railway.json              # Railway deployment configuration
+├── Procfile                  # Process definition for Railway
+├── nixpacks.toml            # Nixpacks build configuration
+├── Dockerfile               # Docker container configuration
+├── env.example              # Environment variables template
+├── RAILWAY_DEPLOYMENT.md    # Detailed Railway deployment guide
+├── commet-remote-data-server/
+│   ├── server.py            # Main Flask application
+│   ├── requirements.txt     # Python dependencies
+│   ├── ai_service.py        # AI service with commit story generation
+│   ├── github_auth.py       # GitHub authentication
+│   └── integrations/        # Jira integration
+└── commet-web-app-frontend/ # React frontend application
+    ├── src/
+    │   ├── components/      # React components
+    │   │   ├── CommitStoryView.tsx    # Commit story display
+    │   │   ├── EnhancedAIChatForm.tsx # Enhanced AI chat
+    │   │   └── MultiProjectSelector.tsx # Multi-project selection
+    │   ├── pages/           # Page components
+    │   ├── services/        # API services
+    │   └── types/           # TypeScript type definitions
+    └── package.json         # Frontend dependencies
+```
 
 ### **Frontend (React + TypeScript)**
 
@@ -117,6 +148,40 @@ Commet consists of two main components:
    - Frontend: `http://localhost:5174`
    - Backend API: `http://localhost:3000`
 
+## 🚀 Railway Deployment
+
+Commet is ready for production deployment on Railway! 
+
+### Quick Deploy to Railway
+
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/your-template-id)
+
+### Manual Railway Setup
+
+1. **Connect to Railway**
+   - Go to [railway.app](https://railway.app) and sign in
+   - Click "New Project" → "Deploy from GitHub repo"
+   - Select your repository
+
+2. **Set Environment Variables**
+   ```bash
+   FLASK_SECRET_KEY=your-secret-key-here
+   GITHUB_CLIENT_ID=your-github-client-id
+   GITHUB_CLIENT_SECRET=your-github-client-secret
+   OPENAI_API_KEY=your-openai-api-key
+   FRONTEND_URL=https://your-frontend-domain.com
+   ```
+
+3. **Configure GitHub OAuth**
+   - Update callback URL to: `https://your-railway-app.up.railway.app/auth/callback`
+
+4. **Deploy**
+   - Railway automatically detects the Python project
+   - Uses `requirements.txt` and `railway.json` for configuration
+   - Health checks at `/health` endpoint
+
+📖 **Detailed deployment guide**: See [RAILWAY_DEPLOYMENT.md](RAILWAY_DEPLOYMENT.md)
+
 ## 📱 Core Pages & Features
 
 ### **🏠 Dashboard**
@@ -141,6 +206,9 @@ Commet consists of two main components:
 - File change tracking
 - Author and committer insights
 - Branch-specific analysis
+- **📖 AI-Powered Commit Stories**: Transform commit history into engaging narratives
+- **Multiple View Modes**: List view and story view options
+- **Story Customization**: Choose from narrative, technical, or casual styles
 
 ### **🤖 AI Chat**
 
@@ -274,6 +342,8 @@ VITE_APP_NAME=Commet
 ### **AI Analysis**
 
 - `POST /api/chat` - AI-powered repository analysis
+- `POST /api/chat/multi-project` - Multi-repository analysis
+- `POST /api/git/commits/story` - Generate commit stories
 - Real-time progress tracking
 - Structured responses
 - Error handling
@@ -350,6 +420,8 @@ VITE_APP_NAME=Commet
 - **Custom Dashboards**: Personalized analytics views
 - **API Rate Optimization**: Enhanced performance
 - **Multi-language Support**: Internationalization
+- **Enhanced Story Features**: More storytelling styles and customization options
+- **Story Export**: Export commit stories to various formats
 
 ### **Enterprise Features**
 

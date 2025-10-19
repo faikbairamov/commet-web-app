@@ -16,7 +16,19 @@ app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production')
 
 # Enable CORS for frontend
-CORS(app, origins=['http://localhost:5173', 'http://localhost:5174'], supports_credentials=True)
+allowed_origins = [
+    'http://localhost:5173', 
+    'http://localhost:5174',
+    'https://commet-web-app-production.up.railway.app',
+    'https://commet-web-app-frontend-production.up.railway.app'
+]
+
+# Add Railway frontend URL if provided
+frontend_url = os.getenv('FRONTEND_URL')
+if frontend_url:
+    allowed_origins.append(frontend_url)
+
+CORS(app, origins=allowed_origins, supports_credentials=True)
 
 # Initialize services
 try:
@@ -1928,8 +1940,12 @@ def internal_error(error):
     return jsonify({"error": "Internal server error"}), 500
 
 if __name__ == '__main__':
-    print("Starting Python server on port 3000...")
-    print("Visit http://localhost:3000 to see the server in action")
+    # Get port from environment variable (Railway sets this)
+    port = int(os.getenv('PORT', 3000))
+    debug = os.getenv('FLASK_ENV') != 'production'
+    
+    print("Starting Python server on port {}...".format(port))
+    print("Visit http://localhost:{} to see the server in action".format(port))
     print("API endpoints available:")
     print("  GET  / - Home page")
     print("  GET  /health - Health check")
@@ -1957,4 +1973,4 @@ if __name__ == '__main__':
     print("    POST /api/integrations/jira/search - Search tickets with JQL")
     print("    POST /webhooks/jira - Handle Jira webhooks")
     
-    app.run(host='0.0.0.0', port=3000, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=debug)
