@@ -1,0 +1,31 @@
+# Copy this file to .env and fill in your actual API keys
+
+# OpenAI API Configuration
+OPENAI_API_KEY=your_openai_api_key_here
+
+# GitHub Configuration (Optional - can also be passed as query parameters)
+GITHUB_TOKEN=your_github_token_here
+
+# GitHub OAuth Configuration
+# Get these from https://github.com/settings/applications/new
+GITHUB_CLIENT_ID=your_github_oauth_client_id_here
+GITHUB_CLIENT_SECRET=your_github_oauth_client_secret_here
+GITHUB_REDIRECT_URI=http://localhost:3000/auth/callback
+
+# Flask Configuration
+FLASK_SECRET_KEY=your_secret_key_here
+
+# Server Configuration
+SERVER_PORT=3000
+DEBUG_MODE=true
+
+# Jira Integration Configuration
+# Get these from your Jira instance
+JIRA_URL=https://your-domain.atlassian.net
+JIRA_EMAIL=your-email@company.com
+JIRA_API_TOKEN=your_jira_api_token_here
+JIRA_PROJECT_KEY=YOUR_PROJECT_KEY
+
+# Auto-ticket creation settings
+JIRA_AUTO_CREATE_TICKETS=true  # Enable/disable automatic ticket creation from AI analysis
+
